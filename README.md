@@ -1,30 +1,47 @@
-# GulfFlow AI
+# GulfFlow AI — Liquid Glass Business Platform
 
-An interactive, responsive Liquid Glass-inspired Next.js dashboard for the GulfFlow AI automation platform.
+A responsive Next.js + TypeScript foundation for a Qatar-first, GCC-ready AI automation SaaS. Designed with translucent Liquid Glass panels, animated visual depth, mobile navigation and an interactive command center.
 
-## Getting started
+## What's already working
+
+- Interactive responsive dashboard with light/dark themes
+- Browser-based CRM: add leads, search and advance lead status
+- Booking requests: sample records and manual confirmation toggles
+- Rule-based AI receptionist preview, clearly labeled simulated
+- Supabase-backed authenticated API endpoints (once configured):
+  - GET /api/health
+  - GET/POST /api/leads
+  - GET/POST /api/bookings
+  - PATCH /api/bookings/status
+  - POST /api/assistant (live provider optional, disabled by default)
+- PostgreSQL migration with tenant-scoped RLS and membership-based permissions
+- GitHub Actions typecheck/build workflow
+
+## Deploy to Vercel
+
+Import this repository at https://vercel.com/new. Next.js is automatically detected. Without credentials the front-end preview works with local browser state and sample data. See docs/VERCEL_SETUP.md.
+
+## Environment variables
+
+Copy .env.example. For database endpoints provide NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never expose service role keys. Live AI additionally requires OPENAI_API_KEY and ENABLE_LIVE_AI=true.
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
+npm run typecheck
 npm run build
 ```
 
-## Vercel
+## Critical limitations
 
-Import `ghostcloud2/Gulf-Flow-` from GitHub at https://vercel.com/new and deploy as a Next.js project. No environment variables are required for this front-end prototype.
+The root dashboard currently uses **sample data held in React state**, not the new database APIs. Authenticated UI and trusted tenant onboarding are not yet implemented. The API routes require a Supabase Auth bearer token and SQL migration. The AI provider is not live without explicit configuration. WhatsApp, payments, email and n8n are not connected. Do not enter real customer data into the demo or treat it as production-ready.
 
-## Current features
+## Architecture and next milestones
 
-- Responsive light/dark dashboard and navigation
-- Sample leads and bookings
-- Add/search/update leads in browser memory
-- Booking status demo
-- Rule-based simulated AI receptionist
-- Placeholder modules for future automations and settings
+See docs/INTEGRATIONS_AND_WORKFLOWS.md. Next: Supabase login UI, secure tenant onboarding, connect CRM/booking UI to API, add audit logs/rate limits, test cross-tenant isolation, then integrate approved channels.
 
-**Important:** This is a front-end demonstration only. Changes reset on refresh. There is no live Supabase database, authentication, tenant isolation, messaging, or real AI integration. Do not use it with customer data. The previous downloadable v0.2 ZIP has additional Supabase starter code, but this repository currently contains a new streamlined Vercel-ready UI foundation rather than an exact upload of that ZIP.
+## Design goal
 
-## Next steps
-
-Implement Supabase Auth, tenant-scoped schema and RLS, secure business onboarding, CRM persistence, booking approval workflows, AI provider integration and comprehensive QA. Build status is not verified until Vercel or local npm build completes.
+Premium iOS-inspired Liquid Glass without copying Apple proprietary assets. Accessible contrast, mobile responsiveness and performance take precedence over decorative effects.
