@@ -9,7 +9,7 @@ import {getBrowserClient,explainSupabaseError} from "../../lib/supabase-browser"
 type Company={id:string;name:string;industry:string;business_model:string;legal_structure:string;description:string;currency:string;locale:string;timezone:string;enabled_modules:string[]};
 type Membership={business_id:string;role:string};
 type Unit={id:string;name:string;kind:string;parent_id:string|null};
-type RecordData={id:string;title:string;record_kind:string;status:string;properties:Record<string,unknown>;created_at:string};
+type RecordData={id:string;title:string;record_kind:string;unit_id:string|null;status:string;properties:Record<string,unknown>;created_at:string};
 type Field={id:string;entity_kind:string;field_key:string;label:string;field_type:string;required:boolean;options:unknown};
 type Knowledge={id:string;question:string;answer:string;published:boolean;created_at:string};
 type Flow={id:string;name:string;description:string;trigger_event:string;status:string;steps:unknown[]};
@@ -42,6 +42,7 @@ export default function WorkspacePage(){
  const [customKind,setCustomKind]=useState("");
  const [recordTitle,setRecordTitle]=useState("");
  const [recordStatus,setRecordStatus]=useState("new");
+ const [recordUnitId,setRecordUnitId]=useState("");
  const [props,setProps]=useState<Record<string,string>>({});
  const [unitName,setUnitName]=useState("");
  const [unitType,setUnitType]=useState("department");
@@ -97,7 +98,7 @@ export default function WorkspacePage(){
   setDetailsLoading(true);
   const queries=[
    db.from("business_units").select("id,name,kind,parent_id").eq("business_id",id).order("created_at",{ascending:true}).limit(250),
-   db.from("business_records").select("id,title,record_kind,status,properties,created_at").eq("business_id",id).order("created_at",{ascending:false}).limit(150),
+   db.from("business_records").select("id,title,record_kind,unit_id,status,properties,created_at").eq("business_id",id).order("created_at",{ascending:false}).limit(150),
    db.from("custom_fields").select("id,entity_kind,field_key,label,field_type,required,options").eq("business_id",id).order("created_at",{ascending:true}).limit(200),
    db.from("knowledge_entries").select("id,question,answer,published,created_at").eq("business_id",id).order("created_at",{ascending:false}).limit(120),
    db.from("workflow_definitions").select("id,name,description,trigger_event,status,steps").eq("business_id",id).order("created_at",{ascending:false}).limit(80),
@@ -127,7 +128,7 @@ export default function WorkspacePage(){
   if(!/^[a-z][a-z0-9_]{1,79}$/.test(activeKind)){report("Entity type must start with a letter and use lowercase letters, numbers or underscores.",true);return}
   const extra:Record<string,unknown>={};
   for(const f of selectedFields){const value=props[f.field_key]?.trim()||"";if(f.required&&!value){report("Complete the required field: "+f.label,true);return}if(value){if(f.field_type==="number"||f.field_type==="currency"){const n=Number(value);if(!Number.isFinite(n)){report("Invalid number for "+f.label,true);return}extra[f.field_key]=n}else if(f.field_type==="boolean"){extra[f.field_key]=value==="true"}else extra[f.field_key]=value}}
-  await action(async()=>{const {error}=await db.from("business_records").insert({business_id:activeId,record_kind:activeKind,title:recordTitle.trim(),status:recordStatus.trim()||"new",properties:extra,created_by:currentUser});if(!error){setRecordTitle("");setProps({})}return {error}},"Record created in the company database.");
+  await action(async()=>{const {error}=await db.from("business_records").insert({business_id:activeId,record_kind:activeKind,title:recordTitle.trim(),unit_id:recordUnitId||null,status:recordStatus.trim()||"new",properties:extra,created_by:currentUser});if(!error){setRecordTitle("");setProps({})}return {error}},"Record created in the company database.");
  }
  async function createUnit(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
   await action(async()=>{const {error}=await db.from("business_units").insert({business_id:activeId,name:unitName.trim(),kind:unitType,parent_id:parentId||null});if(!error)setUnitName("");return {error}},"Organization unit created.");
@@ -176,12 +177,13 @@ export default function WorkspacePage(){
      <div className="gf-card" style={{marginTop:18}}><div className="gf-between"><div><h2>Your latest records</h2><p className="gf-card-desc">Real records, returned under your company's database access policies.</p></div><button className="gf-btn gf-btn-quiet" onClick={()=>setSection("records")}>View records <ArrowRight size={16}/></button></div><div style={{overflowX:"auto",marginTop:15}}><table className="gf-list-table"><thead><tr><th>Record</th><th>Type</th><th>Status</th><th>Created</th></tr></thead><tbody>{records.slice(0,5).map(r=><tr key={r.id}><td>{r.title}</td><td>{r.record_kind}</td><td><GFState>{r.status}</GFState></td><td>{new Date(r.created_at).toLocaleDateString("en")}</td></tr>)}{records.length===0&&<tr><td colSpan={4}>No records yet. Create one in Custom Records.</td></tr>}</tbody></table></div></div>
     </div>}
    {section==="records"&&<div className="gf-grid-2" style={{alignItems:"start"}}>
-    <section className="gf-card"><div className="gf-between"><h2>Custom records</h2><GFState>{records.length} total</GFState></div><p className="gf-card-desc">Build any data model: customers, projects, products, cases, assets or a category you invent.</p><div style={{overflowX:"auto",marginTop:20}}><table className="gf-list-table"><thead><tr><th>Record</th><th>Entity</th><th>Status</th></tr></thead><tbody>{records.map(r=><tr key={r.id}><td><b>{r.title}</b>{Object.entries(r.properties||{}).length>0&&<div className="gf-muted">{Object.entries(r.properties).slice(0,2).map(([k,v])=>k+": "+String(v)).join(" · ")}</div>}</td><td>{r.record_kind}</td><td><GFState>{r.status}</GFState></td></tr>)}{!records.length&&<tr><td colSpan={3}>No records in this company yet.</td></tr>}</tbody></table></div></section>
+    <section className="gf-card"><div className="gf-between"><h2>Custom records</h2><GFState>{records.length} total</GFState></div><p className="gf-card-desc">Build any data model: customers, projects, products, cases, assets or a category you invent.</p><div style={{overflowX:"auto",marginTop:20}}><table className="gf-list-table"><thead><tr><th>Record</th><th>Entity</th><th>Status</th></tr></thead><tbody>{records.map(r=><tr key={r.id}><td><b>{r.title}</b>{Object.entries(r.properties||{}).length>0&&<div className="gf-muted">{Object.entries(r.properties).slice(0,2).map(([k,v])=>k+": "+String(v)).join(" · ")}</div>}</td><td>{r.record_kind}{r.unit_id&&<div className="gf-muted">{units.find(u=>u.id===r.unit_id)?.name||"Unit"}</div>}</td><td><GFState>{r.status}</GFState></td></tr>)}{!records.length&&<tr><td colSpan={3}>No records in this company yet.</td></tr>}</tbody></table></div></section>
     <section className="gf-card"><h2>Create a record</h2><p className="gf-card-desc">All data belongs to {selected?.name} and follows company-level RLS.</p><form className="gf-form" style={{marginTop:21}} onSubmit={e=>void createRecord(e)}>
       <label className="gf-field"><span>Entity type</span><select className="gf-select" value={kind} onChange={e=>{setKind(e.target.value);setProps({})}}>{ENTITY_TYPES.map(k=><option key={k} value={k}>{k.replace(/_/g," ").replace(/^./,s=>s.toUpperCase())}</option>)}</select></label>
       {kind==="custom"&&<label className="gf-field"><span>Custom entity key</span><input className="gf-input" value={customKind} onChange={e=>setCustomKind(e.target.value)} placeholder="e.g. vehicle_inspection" maxLength={80}/></label>}
       <label className="gf-field"><span>Record name</span><input className="gf-input" required minLength={2} maxLength={200} value={recordTitle} onChange={e=>setRecordTitle(e.target.value)} placeholder="e.g. Project Apollo"/></label>
       <label className="gf-field"><span>Status</span><input className="gf-input" value={recordStatus} maxLength={60} onChange={e=>setRecordStatus(e.target.value)} placeholder="new"/></label>
+      <label className="gf-field"><span>Department / branch (optional)</span><select className="gf-select" value={recordUnitId} onChange={e=>setRecordUnitId(e.target.value)}><option value="">Company-level record</option>{units.map(u=><option key={u.id} value={u.id}>{u.name} · {u.kind.replaceAll("_"," ")}</option>)}</select></label>
       {selectedFields.map(f=><label className="gf-field" key={f.id}><span>{f.label}{f.required?" *":""}</span>{f.field_type==="select"?
         <select className="gf-select" required={f.required} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}><option value="">Select an option</option>{(Array.isArray(f.options)?f.options:[]).map((x,i)=><option key={i} value={String(x)}>{String(x)}</option>)}</select>
        :f.field_type==="boolean"?<select className="gf-select" required={f.required} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}><option value="">Select</option><option value="true">Yes</option><option value="false">No</option></select>
