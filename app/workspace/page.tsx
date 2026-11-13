@@ -17,6 +17,8 @@ type Agent={id:string;name:string;purpose:string;instructions:string;status:stri
 type Integr={id:string;provider:string;status:string;last_checked_at:string|null};
 type Section="overview"|"records"|"structure"|"fields"|"knowledge"|"flows"|"agents"|"integrations"|"settings";
 const nav:[Section,string][]=[["overview","Command Center"],["records","Custom Records"],["structure","Organization"],["fields","Data Studio"],["knowledge","Knowledge Base"],["flows","Flow Studio"],["agents","AI Agents"],["integrations","Integrations"],["settings","Settings"]];
+const optionalSectionModule:Partial<Record<Section,string>>={knowledge:"knowledge",flows:"automations",agents:"ai"};
+
 export default function WorkspacePage(){
  const router=useRouter();
  const [currentUser,setCurrentUser]=useState<string|null>(null);
@@ -64,6 +66,7 @@ export default function WorkspacePage(){
  const selected=companies.find(c=>c.id===activeId)||null;
  const myRole=memberships.find(m=>m.business_id===activeId)?.role||"viewer";
  const isAdmin=myRole==="owner"||myRole==="manager";
+ const visibleNav=nav.filter(([key])=>!optionalSectionModule[key]||(selected?.enabled_modules||[]).includes(optionalSectionModule[key]!));
  const canEdit=myRole!=="viewer";
  const activeKind=kind==="custom"?(customKind.trim().toLowerCase().replace(/[^a-z0-9_]/g,"_")||"custom"):kind;
  const selectedFields=useMemo(()=>fields.filter(f=>f.entity_kind===activeKind),[fields,activeKind]);
@@ -115,7 +118,7 @@ export default function WorkspacePage(){
   setDetailsLoading(false);
  },[]);
  useEffect(()=>{void fetchCompanies()},[fetchCompanies]);
- useEffect(()=>{if(activeId){const company=companies.find(c=>c.id===activeId);setCompanyDescription(company?.description||"");setCustomModules(company?.enabled_modules||[]);void fetchDetails(activeId)}},[activeId,fetchDetails,companies]);
+ useEffect(()=>{if(activeId){const company=companies.find(c=>c.id===activeId);setCompanyDescription(company?.description||"");setCustomModules(company?.enabled_modules||[]);setSection("overview");void fetchDetails(activeId)}},[activeId,fetchDetails,companies]);
  async function action(fn:()=>Promise<{error?:{message:string}|null}|void>,success:string){
   setSaving(true);report("");
   try{const r=await fn();if(r&&"error"in r&&r.error){report(explainSupabaseError(r.error),true)}else{report(success);await fetchDetails(activeId)}}catch(e){report(explainSupabaseError(e),true)}finally{setSaving(false)}
@@ -161,7 +164,7 @@ export default function WorkspacePage(){
      <div className="gf-row" style={{flexWrap:"wrap"}}><GFState tone="positive">{myRole.toUpperCase()}</GFState><GFState>{selected?.business_model||"Custom"}</GFState><Link className="gf-btn gf-btn-secondary" href="/studio"><Plus size={16}/> New company</Link></div>
     </div>
    </div>
-   <div className="gf-tabs" role="tablist" aria-label="Workspace modules">{nav.map(([key,label])=><button role="tab" aria-selected={section===key} key={key} onClick={()=>{setSection(key);report("")}} className={"gf-tab "+(section===key?"gf-selected":"")}>{label}</button>)}</div>
+   <div className="gf-tabs" role="tablist" aria-label="Workspace modules">{visibleNav.map(([key,label])=><button role="tab" aria-selected={section===key} key={key} onClick={()=>{setSection(key);report("")}} className={"gf-tab "+(section===key?"gf-selected":"")}>{label}</button>)}</div>
    {detailsLoading&&<div className="gf-row gf-muted" style={{marginBottom:15}}><span className="gf-busy"/> Syncing company records...</div>}
    {message&&<div className={"gf-feedback "+(isError?"error":"success")} role="status" style={{marginBottom:20}}>{message}</div>}
    {section==="overview"&&<div>
