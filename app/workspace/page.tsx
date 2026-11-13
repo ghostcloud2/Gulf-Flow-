@@ -48,10 +48,14 @@ export default function WorkspacePage(){
  const [fieldName,setFieldName]=useState("");
  const [fieldType,setFieldType]=useState("text");
  const [fieldRequired,setFieldRequired]=useState(false);
+ const [fieldOptions,setFieldOptions]=useState("");
  const [kbQuestion,setKbQuestion]=useState("");
  const [kbAnswer,setKbAnswer]=useState("");
  const [workflowName,setWorkflowName]=useState("");
  const [workflowTrigger,setWorkflowTrigger]=useState("lead.created");
+ const [workflowSteps,setWorkflowSteps]=useState<Array<{type:string;description:string}>>([]);
+ const [workflowStepType,setWorkflowStepType]=useState("create_task");
+ const [workflowStepDescription,setWorkflowStepDescription]=useState("");
  const [agentName,setAgentName]=useState("");
  const [agentPurpose,setAgentPurpose]=useState("Customer support");
  const [agentInstructions,setAgentInstructions]=useState("");
@@ -118,8 +122,8 @@ export default function WorkspacePage(){
  }
  async function createRecord(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db||!currentUser||!selected)return;
   if(!/^[a-z][a-z0-9_]{1,79}$/.test(activeKind)){report("Entity type must start with a letter and use lowercase letters, numbers or underscores.",true);return}
-  const extra:Record<string,string>={};
-  for(const f of selectedFields){const value=props[f.field_key]?.trim()||"";if(f.required&&!value){report("Complete the required field: "+f.label,true);return}if(value)extra[f.field_key]=value}
+  const extra:Record<string,unknown>={};
+  for(const f of selectedFields){const value=props[f.field_key]?.trim()||"";if(f.required&&!value){report("Complete the required field: "+f.label,true);return}if(value){if(f.field_type==="number"||f.field_type==="currency"){const n=Number(value);if(!Number.isFinite(n)){report("Invalid number for "+f.label,true);return}extra[f.field_key]=n}else if(f.field_type==="boolean"){extra[f.field_key]=value==="true"}else extra[f.field_key]=value}}
   await action(async()=>{const {error}=await db.from("business_records").insert({business_id:activeId,record_kind:activeKind,title:recordTitle.trim(),status:recordStatus.trim()||"new",properties:extra,created_by:currentUser});if(!error){setRecordTitle("");setProps({})}return {error}},"Record created in the company database.");
  }
  async function createUnit(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
@@ -128,7 +132,7 @@ export default function WorkspacePage(){
  async function createField(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
   const field_key=fieldName.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
   if(!/^[a-z][a-z0-9_]{1,63}$/.test(field_key)){report("Field name must form a key with at least two letters.",true);return}
-  await action(async()=>{const {error}=await db.from("custom_fields").insert({business_id:activeId,entity_kind:fieldEntity,field_key,label:fieldName.trim(),field_type:fieldType,required:fieldRequired});if(!error)setFieldName("");return {error}},"Custom field added. This field now appears on matching record forms.");
+  await action(async()=>{const {error}=await db.from("custom_fields").insert({business_id:activeId,entity_kind:fieldEntity,field_key,label:fieldName.trim(),field_type:fieldType,required:fieldRequired,options:fieldType==="select"?fieldOptions.split(",").map(x=>x.trim()).filter(Boolean).slice(0,50):[]});if(!error){setFieldName("");setFieldOptions("")}return {error}},"Custom field added. This field now appears on matching record forms.");
  }
  async function createKnowledge(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
   await action(async()=>{const {error}=await db.from("knowledge_entries").insert({business_id:activeId,question:kbQuestion.trim(),answer:kbAnswer.trim(),published:false});if(!error){setKbQuestion("");setKbAnswer("")}return {error}},"Knowledge entry saved as draft. Publish it before AI may use it.");
@@ -137,7 +141,7 @@ export default function WorkspacePage(){
   const {error}=await db.from("knowledge_entries").update({published:!k.published}).eq("id",k.id).eq("business_id",activeId);return {error};
  },k.published?"Entry unpublished; AI cannot retrieve it.":"Entry published for authorized assistant retrieval.");}
  async function createFlow(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
-  await action(async()=>{const {error}=await db.from("workflow_definitions").insert({business_id:activeId,name:workflowName.trim(),trigger_event:workflowTrigger.trim(),description:"Designed in GulfFlow Flow Studio",status:"draft",steps:[]});if(!error)setWorkflowName("");return {error}},"Workflow definition saved. Execution is not connected yet.");
+  await action(async()=>{const {error}=await db.from("workflow_definitions").insert({business_id:activeId,name:workflowName.trim(),trigger_event:workflowTrigger.trim(),description:"Designed in GulfFlow Flow Studio",status:"draft",steps:workflowSteps});if(!error){setWorkflowName("");setWorkflowSteps([])}return {error}},"Workflow definition saved. Execution is not connected yet.");
  }
  async function createAgent(e:FormEvent){e.preventDefault();const db=getBrowserClient();if(!db)return;
   await action(async()=>{const {error}=await db.from("ai_agents").insert({business_id:activeId,name:agentName.trim(),purpose:agentPurpose.trim(),instructions:agentInstructions.trim(),status:"draft",approval_required:true,language:selected?.locale||"en"});if(!error){setAgentName("");setAgentInstructions("")}return {error}},"AI agent profile saved as a draft.");
@@ -175,7 +179,11 @@ export default function WorkspacePage(){
       {kind==="custom"&&<label className="gf-field"><span>Custom entity key</span><input className="gf-input" value={customKind} onChange={e=>setCustomKind(e.target.value)} placeholder="e.g. vehicle_inspection" maxLength={80}/></label>}
       <label className="gf-field"><span>Record name</span><input className="gf-input" required minLength={2} maxLength={200} value={recordTitle} onChange={e=>setRecordTitle(e.target.value)} placeholder="e.g. Project Apollo"/></label>
       <label className="gf-field"><span>Status</span><input className="gf-input" value={recordStatus} maxLength={60} onChange={e=>setRecordStatus(e.target.value)} placeholder="new"/></label>
-      {selectedFields.map(f=><label className="gf-field" key={f.id}><span>{f.label}{f.required?" *":""}</span><input className="gf-input" required={f.required} type={f.field_type==="number"||f.field_type==="currency"?"number":f.field_type==="email"?"email":f.field_type==="date"?"date":"text"} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}/></label>)}
+      {selectedFields.map(f=><label className="gf-field" key={f.id}><span>{f.label}{f.required?" *":""}</span>{f.field_type==="select"?
+        <select className="gf-select" required={f.required} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}><option value="">Select an option</option>{(Array.isArray(f.options)?f.options:[]).map((x,i)=><option key={i} value={String(x)}>{String(x)}</option>)}</select>
+       :f.field_type==="boolean"?<select className="gf-select" required={f.required} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}><option value="">Select</option><option value="true">Yes</option><option value="false">No</option></select>
+       :f.field_type==="long_text"?<textarea className="gf-textarea" required={f.required} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}/>
+       :<input className="gf-input" required={f.required} type={f.field_type==="number"||f.field_type==="currency"?"number":f.field_type==="email"?"email":f.field_type==="date"?"date":f.field_type==="datetime"?"datetime-local":f.field_type==="url"?"url":"text"} value={props[f.field_key]||""} onChange={e=>setProps(v=>({...v,[f.field_key]:e.target.value}))}/>}</label>)}
       {selectedFields.length===0&&<div className="gf-info-strip"><Info size={16}/><span>No custom fields for this entity. Use Data Studio to define fields for your company's record types.</span></div>}
       <button className="gf-btn gf-btn-primary" disabled={saving||!canEdit||!recordTitle.trim()} type="submit"><Plus size={17}/> Save record</button>
     </form></section>
@@ -197,6 +205,7 @@ export default function WorkspacePage(){
       <label className="gf-field"><span>Entity type</span><input className="gf-input" required value={fieldEntity} maxLength={80} onChange={e=>setFieldEntity(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"_"))} placeholder="customer"/></label>
       <label className="gf-field"><span>Field label</span><input className="gf-input" required minLength={2} maxLength={120} value={fieldName} onChange={e=>setFieldName(e.target.value)} placeholder="e.g. Preferred service"/></label>
       <label className="gf-field"><span>Data type</span><select className="gf-select" value={fieldType} onChange={e=>setFieldType(e.target.value)}>{["text","long_text","number","currency","date","datetime","boolean","select","email","phone","url"].map(x=><option value={x} key={x}>{x.replace("_"," ")}</option>)}</select></label>
+      {fieldType==="select"&&<label className="gf-field"><span>Dropdown options (comma-separated)</span><input className="gf-input" required value={fieldOptions} onChange={e=>setFieldOptions(e.target.value)} maxLength={1000} placeholder="e.g. New, In progress, Complete"/></label>}
       <label className="gf-choice"><input type="checkbox" checked={fieldRequired} onChange={e=>setFieldRequired(e.target.checked)}/><span>Required when adding records</span></label>
       <button type="submit" className="gf-btn gf-btn-primary" disabled={saving||!isAdmin}><Plus size={16}/> Add schema field</button>
     </form></section>
@@ -214,7 +223,13 @@ export default function WorkspacePage(){
     <section className="gf-card"><h2>Create workflow design</h2><p className="gf-card-desc">Definitions are saved in the database as drafts. This screen does not trigger emails, messages or external actions yet.</p><form className="gf-form" style={{marginTop:20}} onSubmit={e=>void createFlow(e)}>
      <label className="gf-field"><span>Workflow name</span><input className="gf-input" value={workflowName} onChange={e=>setWorkflowName(e.target.value)} required minLength={2} maxLength={160} placeholder="e.g. New customer onboarding"/></label>
      <label className="gf-field"><span>Trigger event</span><select className="gf-select" value={workflowTrigger} onChange={e=>setWorkflowTrigger(e.target.value)}>{["lead.created","record.created","booking.requested","message.received","customer.updated","invoice.due","manual.trigger"].map(t=><option value={t} key={t}>{t}</option>)}</select></label>
-     <button type="submit" disabled={saving||!isAdmin} className="gf-btn gf-btn-primary"><Plus size={16}/> Save workflow draft</button>
+     <div className="gf-card-soft"><strong style={{fontSize:13}}>Workflow steps</strong><p className="gf-card-desc">Build a sequence of intended actions. Execution is disabled until a trusted worker is connected.</p>
+       <div style={{display:"grid",gap:7,margin:"14px 0"}}>{workflowSteps.map((st,i)=><div key={i} className="gf-between gf-flow-pill"><span>{i+1}. {st.type.replaceAll("_"," ")} — {st.description}</span><button className="gf-btn gf-btn-quiet" type="button" aria-label={"Remove step "+(i+1)} onClick={()=>setWorkflowSteps(v=>v.filter((_,j)=>j!==i))}>Remove</button></div>)}</div>
+       <label className="gf-field"><span>Step action</span><select className="gf-select" value={workflowStepType} onChange={e=>setWorkflowStepType(e.target.value)}>{["create_task","assign_staff","notify_staff","request_approval","update_record","send_message","webhook"].map(x=><option value={x} key={x}>{x.replaceAll("_"," ")}</option>)}</select></label>
+       <label className="gf-field" style={{marginTop:10}}><span>What should happen?</span><input className="gf-input" maxLength={240} placeholder="Describe the action or destination" value={workflowStepDescription} onChange={e=>setWorkflowStepDescription(e.target.value)}/></label>
+       <button className="gf-btn gf-btn-secondary" style={{marginTop:12}} type="button" disabled={!workflowStepDescription.trim()||workflowSteps.length>=20} onClick={()=>{setWorkflowSteps(v=>[...v,{type:workflowStepType,description:workflowStepDescription.trim()}]);setWorkflowStepDescription("")}}><Plus size={15}/> Add step</button>
+     </div>
+     <button type="submit" disabled={saving||!isAdmin} className="gf-btn gf-btn-primary"><Plus size={16}/> Save workflow draft ({workflowSteps.length} steps)</button>
     </form></section>
    </div>}
    {section==="agents"&&<div className="gf-grid-2" style={{alignItems:"start"}}>
