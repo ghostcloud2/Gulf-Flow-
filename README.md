@@ -1,31 +1,32 @@
-# GulfFlow AI — Liquid Glass Business Platform
+# GulfFlow AI · Universal Business OS
 
-A responsive Next.js + TypeScript foundation for a Qatar-first, GCC-ready AI automation SaaS. Designed with translucent Liquid Glass panels, animated visual depth, mobile navigation and an interactive command center.
+**GulfFlow is an AI-assisted, modular business operating system, not a single-industry CRM.** Every company can independently select its business model, organizational structure, modules, data fields, workflow definitions and knowledge rules.
 
-## What's already working
+## Live application
 
-- Interactive responsive dashboard with light/dark themes
-- Browser-based CRM: add leads, search and advance lead status
-- Booking requests: sample records and manual confirmation toggles
-- Rule-based AI receptionist preview, clearly labeled simulated
-- Supabase-backed authenticated API endpoints (once configured):
-  - GET /api/health
-  - GET/POST /api/leads
-  - GET/POST /api/bookings
-  - PATCH /api/bookings/status
-  - POST /api/assistant (live provider optional, disabled by default)
-- PostgreSQL migration with tenant-scoped RLS and membership-based permissions
-- GitHub Actions typecheck/build workflow
+Vercel: https://vercel.com/robinsonkip4-7991/gulf-flow (project linked to `ghostcloud2/Gulf-Flow-`).
 
-## Deploy to Vercel
+| Route | Feature |
+|---|---|
+| `/` | Premium Liquid Glass-inspired landing |
+| `/studio` | Four-step universal company creation flow |
+| `/sign-in` | Supabase email authentication and recovery |
+| `/workspace` | Authenticated company control center, custom records, units, data fields, knowledge, workflows and agent profiles |
+| `/copilot` | Company-scoped knowledge assistant and source citations |
+| `/demo` | Preserved interactive local-only dashboard |
+| `/api/health` | Configuration flags (never secrets) |
 
-Import this repository at https://vercel.com/new. Next.js is automatically detected. Without credentials the front-end preview works with local browser state and sample data. See docs/VERCEL_SETUP.md.
+## Setup and database
 
-## Environment variables
+The Vercel project already has a connected Supabase integration, but `/workspace` is operational **only after both migrations are applied**:
 
-Copy .env.example. For database endpoints provide NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never expose service role keys. Live AI additionally requires OPENAI_API_KEY and ENABLE_LIVE_AI=true.
+1. Review `supabase/migrations/001_core.sql` and `002_universal_business_os.sql`.
+2. Apply migrations in order to a backed-up test Supabase project using SQL Editor. This step is **not automatic**.
+3. Ensure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` exist in Vercel.
+4. Configure Supabase Auth redirect URL allowlist for the deployed domain.
+5. Create an account via `/sign-in`, configure company via `/studio`, and manage records via `/workspace`.
 
-## Run locally
+## Local development
 
 ```bash
 npm install
@@ -34,14 +35,12 @@ npm run typecheck
 npm run build
 ```
 
-## Critical limitations
+To enable optional live AI, add `OPENAI_API_KEY`, `ENABLE_LIVE_AI=true` and optional `OPENAI_MODEL` to **server-only** Vercel environment settings. Live AI remains off by default. Use spending limits and rate limits before enabling in production.
 
-The root dashboard currently uses **sample data held in React state**, not the new database APIs. Authenticated UI and trusted tenant onboarding are not yet implemented. The API routes require a Supabase Auth bearer token and SQL migration. The AI provider is not live without explicit configuration. WhatsApp, payments, email and n8n are not connected. Do not enter real customer data into the demo or treat it as production-ready.
+## Built vs planned
 
-## Architecture and next milestones
+Built: responsive UI, editable company blueprints, business units, custom fields and entity records, database RLS policies, owner onboarding RPC, knowledge publishing flow, workflow draft designer, agent profiles, authenticated knowledge search and optional OpenAI provider endpoint. These features require applying the database migration.
 
-See docs/INTEGRATIONS_AND_WORKFLOWS.md. Next: Supabase login UI, secure tenant onboarding, connect CRM/booking UI to API, add audit logs/rate limits, test cross-tenant isolation, then integrate approved channels.
+Not yet built: production-grade workflow executor, verified WhatsApp and email integrations, calendar availability, payment capture, autonomous agent tool execution, company member invitations, rate limiting, full Arabic RTL, and production compliance assurance. Do **not** claim these are live.
 
-## Design goal
-
-Premium iOS-inspired Liquid Glass without copying Apple proprietary assets. Accessible contrast, mobile responsiveness and performance take precedence over decorative effects.
+See `docs/UNIVERSAL_BUSINESS_OS.md` for architecture and `docs/QA_ACCEPTANCE.md` for tests.
