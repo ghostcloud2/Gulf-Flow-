@@ -1,6 +1,6 @@
 -- GulfFlow Universal Business OS v0.5
 -- Apply AFTER 001_core.sql in Supabase SQL Editor.
--- This migration is idempotent for a clean v0.4 project.
+-- Run once, after backing up and reviewing the schema. Do not blindly re-run policy creation.
 -- It adds independently configurable companies; tenant isolation is a security boundary,
 -- not an industry restriction.
 
@@ -256,3 +256,50 @@ alter table public.booking_requests
   add constraint booking_requests_lead_same_business
   foreign key (business_id,lead_id)
   references public.leads(business_id,id);
+
+-- Immutability and audit controls; statements execute under the caller's RLS.
+create or replace function public.guard_business_record_update()
+returns trigger language plpgsql set search_path = ''
+as $$
+begin
+ if new.business_id is distinct from old.business_id or
+    new.created_by is distinct from old.created_by or
+    new.created_at is distinct from old.created_at then
+   raise exception 'Record ownership and creator metadata cannot be changed';
+ end if;
+ new.updated_at := now();
+ return new;
+end $$;
+create trigger guard_business_record_update_trigger
+  before update on public.business_records
+  for each row execute function public.guard_business_record_update();
+
+-- Minimal non-PII audit metadata. Do not log raw customer record properties.
+create or replace function public.audit_business_change()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare
+ ref uuid;
+ company uuid;
+begin
+ if tg_op='DELETE' then
+   ref:=old.id;company:=old.business_id;
+ else
+   ref:=new.id;company:=new.business_id;
+ end if;
+ insert into public.audit_events(business_id,actor_id,event_type,payload)
+   values(company,auth.uid(),tg_table_name||'.'||lower(tg_op),
+   jsonb_build_object('record_id',ref));
+ if tg_op='DELETE' then return old; end if;
+ return new;
+end $$;
+create trigger audit_business_records after insert or update or delete on public.business_records
+  for each row execute function public.audit_business_change();
+create trigger audit_business_units after insert or update or delete on public.business_units
+  for each row execute function public.audit_business_change();
+create trigger audit_knowledge after insert or update or delete on public.knowledge_entries
+  for each row execute function public.audit_business_change();
+create trigger audit_workflows after insert or update or delete on public.workflow_definitions
+  for each row execute function public.audit_business_change();
+create trigger audit_agents after insert or update or delete on public.ai_agents
+  for each row execute function public.audit_business_change();
